@@ -6,38 +6,27 @@ const app = express();
 
 app.use(cors());
 
-// Daftar domain Otakudesu (urutan dari yang paling stabil)
-const DOMAINS = [
-    'https://otakudesu.best/',
-    'https://otakudesu.cloud/',
-    'https://otakudesu.cam/'
-];
+// Gunakan proxy untuk menembus blokir IP
+const getProxyUrl = (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
 
-const fetchD = async (endpoint) => {
-    for (let domain of DOMAINS) {
-        try {
-            const targetUrl = domain + endpoint;
-            const { data } = await axios.get(targetUrl, { 
-                timeout: 8000,
-                headers: { 
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                    'Referer': domain
-                }
-            });
-            if (data) return cheerio.load(data);
-        } catch (e) {
-            console.log(`Gagal di domain ${domain}, mencoba domain lain...`);
-            continue; 
-        }
+const fetchD = async (url) => {
+    try {
+        const { data } = await axios.get(getProxyUrl(url), { timeout: 15000 });
+        // AllOrigins mengembalikan data dalam bentuk { contents: "html nya di sini" }
+        return cheerio.load(data.contents);
+    } catch (e) {
+        console.error("Gagal mengambil data via Proxy:", e.message);
+        return null;
     }
-    return null; 
 };
+
+const BASE = 'https://otakudesu.best/';
 
 app.get('/api/ping', (req, res) => res.json({ s: 'ok' }));
 
 app.get('/api/terbaru', async (req, res) => {
-    const $ = await fetchD('');
-    if (!$) return res.json([{title: "Semua Server Down - Coba Lagi Nanti", thumb: "", id: ""}]);
+    const $ = await fetchD(BASE);
+    if (!$) return res.json([{title: "Server Sangat Sibuk - Coba Lagi Nanti", thumb: "", id: ""}]);
     
     const r = [];
     $('.venz ul li').each((i, el) => {
@@ -53,9 +42,8 @@ app.get('/api/terbaru', async (req, res) => {
     res.json(r);
 });
 
-// Endpoint Detail & Video juga disesuaikan pake fetchD
 app.get('/api/detail/:id', async (req, res) => {
-    const $ = await fetchD(`anime/${req.params.id}/`);
+    const $ = await fetchD(`${BASE}anime/${req.params.id}/`);
     if (!$) return res.json({ e: 1 });
     const eps = [];
     $('.episodelist ul li').each((i, el) => {
@@ -71,7 +59,7 @@ app.get('/api/detail/:id', async (req, res) => {
 });
 
 app.get('/api/video/:id', async (req, res) => {
-    const $ = await fetchD(`episode/${req.params.id}/`);
+    const $ = await fetchD(`${BASE}episode/${req.params.id}/`);
     if(!$) return res.json({u: '', dl: []});
     let v = $('#pembed iframe').attr('src') || $('.responsive-embed-stream iframe').attr('src');
     const dl = [];
@@ -86,4 +74,3 @@ app.get('/api/video/:id', async (req, res) => {
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => console.log(`Server nyala di port ${PORT}`));
-                             
