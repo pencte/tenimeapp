@@ -79,6 +79,13 @@ app.get('/api/video/:id', async (req, res) => {
     });
     res.json({ u: v || '', dl });
 });
+// ... (Bagian atas kode scraping lo tetep sama)
 
-module.exports = app;
+// HAPUS module.exports = app;
+// GANTI DENGAN INI:
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => {
+    console.log(`Server nyala di port ${PORT}`);
+});
+        
       
