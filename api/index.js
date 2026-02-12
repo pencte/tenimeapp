@@ -15,15 +15,12 @@ const fetchD = async (url) => {
             httpsAgent: agent,
             timeout: 10000,
             headers: { 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                 'Referer': BASE_URL
             }
         });
         return cheerio.load(data);
-    } catch (e) { 
-        console.error("Fetch Error:", e.message);
-        return null; 
-    }
+    } catch (e) { return null; }
 };
 
 app.get('/api/ping', (req, res) => res.json({ s: 'ok' }));
@@ -39,7 +36,7 @@ app.get('/api/terbaru', async (req, res) => {
                 title: $(el).find('h2').text().trim(),
                 thumb: $(el).find('img').attr('src'),
                 id: link.split('/').filter(Boolean).pop(),
-                score: $(el).find('.skor').text().trim() || 'N/A'
+                score: $(el).find('.skor').text().trim() || '0'
             });
         }
     });
@@ -52,18 +49,16 @@ app.get('/api/detail/:id', async (req, res) => {
     const eps = [];
     $('.episodelist ul li').each((i, el) => {
         const a = $(el).find('a');
-        const href = a.attr('href');
-        if (href && href.includes('/episode/')) {
+        if (a.attr('href')) {
             eps.push({ 
                 title: a.text().trim(), 
-                id: href.split('/').filter(Boolean).pop() 
+                id: a.attr('href').split('/').filter(Boolean).pop() 
             });
         }
     });
     res.json({ 
         sinop: $('.sinopc').first().text().trim(), 
         thumb: $('.fotoanime img').attr('src'),
-        score: $('.infozingle p:contains("Skor")').text().split(':')[1]?.trim() || 'N/A',
         eps: eps
     });
 });
@@ -72,12 +67,15 @@ app.get('/api/video/:id', async (req, res) => {
     const $ = await fetchD(`${BASE_URL}episode/${req.params.id}`);
     if(!$) return res.json({u: '', dl: []});
     
-    // Cari iframe di area streaming
-    let streamUrl = $('#pembed iframe').attr('src') || $('.responsive-embed-stream iframe').attr('src');
+    // Taktik 1: Cari di iframe utama
+    let v = $('.responsive-embed-stream iframe').attr('src') || $('#pembed iframe').attr('src');
     
-    // Jika tidak ketemu, coba cari di area lain
-    if(!streamUrl) {
-        streamUrl = $('iframe').first().attr('src');
+    // Taktik 2: Jika masih kosong, cari di semua iframe yang ada
+    if(!v) {
+        $('iframe').each((i, el) => {
+            const src = $(el).attr('src');
+            if(src && (src.includes('desustream') || src.includes('embed'))) v = src;
+        });
     }
 
     const dl = [];
@@ -90,7 +88,7 @@ app.get('/api/video/:id', async (req, res) => {
         if(q) dl.push({ q, links });
     });
 
-    res.json({ u: streamUrl, dl });
+    res.json({ u: v || '', dl });
 });
 
 module.exports = app;
