@@ -1,19 +1,19 @@
-# Pake Node.js versi 18
-FROM node:18-slim
+# Pake Node.js versi 20 (LTS) supaya support fitur 'File'
+FROM node:20-slim
 
 # Set folder kerja
 WORKDIR /app
 
-# Copy file package.json dulu
+# Copy file package.json
 COPY package.json ./
 
-# Instal library secara paksa (tanpa perlu lockfile)
+# Instal library (Docker gak butuh lockfile)
 RUN npm install --production
 
-# Copy semua file kodingan lo ke dalam server
+# Copy semua file kodingan lo
 COPY . .
 
-# Set Port (Koyeb biasanya pake 8000 atau sesuai settingan)
+# Set Port ke 8000
 EXPOSE 8000
 
 # Jalankan aplikasinya
