@@ -1,6 +1,8 @@
 {
   "name": "tenime-koyeb",
   "version": "1.0.0",
+  "description": "Anime scraper for Koyeb",
+  "main": "api/index.js",
   "scripts": {
     "start": "node api/index.js"
   },
@@ -9,5 +11,8 @@
     "cheerio": "^1.0.0-rc.12",
     "cors": "^2.8.5",
     "express": "^4.18.2"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
