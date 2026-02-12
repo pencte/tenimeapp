@@ -6,16 +6,16 @@ const app = express();
 
 app.use(cors());
 
-// Gunakan proxy untuk menembus blokir IP
-const getProxyUrl = (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-
+// Gunakan Proxy yang paling stabil saat ini
 const fetchD = async (url) => {
     try {
-        const { data } = await axios.get(getProxyUrl(url), { timeout: 15000 });
-        // AllOrigins mengembalikan data dalam bentuk { contents: "html nya di sini" }
-        return cheerio.load(data.contents);
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        const { data } = await axios.get(proxyUrl, { 
+            timeout: 10000,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        return cheerio.load(data);
     } catch (e) {
-        console.error("Gagal mengambil data via Proxy:", e.message);
         return null;
     }
 };
@@ -26,8 +26,7 @@ app.get('/api/ping', (req, res) => res.json({ s: 'ok' }));
 
 app.get('/api/terbaru', async (req, res) => {
     const $ = await fetchD(BASE);
-    if (!$) return res.json([{title: "Server Sangat Sibuk - Coba Lagi Nanti", thumb: "", id: ""}]);
-    
+    if (!$) return res.json([{title: "Server Sibuk", thumb: "", id: ""}]);
     const r = [];
     $('.venz ul li').each((i, el) => {
         const link = $(el).find('a').attr('href');
@@ -55,20 +54,37 @@ app.get('/api/detail/:id', async (req, res) => {
             });
         }
     });
-    res.json({ sinop: $('.sinopc').first().text().trim(), thumb: $('.fotoanime img').attr('src'), eps });
+    res.json({ 
+        sinop: $('.sinopc').first().text().trim() || "Sinopsis tidak tersedia", 
+        thumb: $('.fotoanime img').attr('src'), 
+        eps 
+    });
 });
 
 app.get('/api/video/:id', async (req, res) => {
     const $ = await fetchD(`${BASE}episode/${req.params.id}/`);
     if(!$) return res.json({u: '', dl: []});
-    let v = $('#pembed iframe').attr('src') || $('.responsive-embed-stream iframe').attr('src');
+    
+    // 1. Cari Link Stream (Coba 3 kemungkinan tempat)
+    let v = $('#pembed iframe').attr('src') || 
+            $('.responsive-embed-stream iframe').attr('src') || 
+            $('.video-content iframe').attr('src');
+
+    // 2. Cari Link Download (Struktur Baru)
     const dl = [];
     $('.download ul li').each((i, el) => {
-        const q = $(el).find('strong').text().trim();
-        const links = [];
-        $(el).find('a').each((j, a) => { links.push({ h: $(a).text().trim(), u: $(a).attr('href') }); });
-        if(q) dl.push({ q, links });
+        const quality = $(el).find('strong').text().trim() || $(el).find('i').text().trim();
+        if (quality) {
+            const links = [];
+            $(el).find('a').each((j, a) => {
+                const name = $(a).text().trim();
+                const url = $(a).attr('href');
+                if (url) links.push({ h: name, u: url });
+            });
+            if (links.length > 0) dl.push({ q: quality, links });
+        }
     });
+
     res.json({ u: v || '', dl });
 });
 
