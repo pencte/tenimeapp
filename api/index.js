@@ -15,7 +15,7 @@ const fetchD = async (url) => {
             httpsAgent: agent,
             timeout: 10000,
             headers: { 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Referer': BASE_URL
             }
         });
@@ -52,46 +52,45 @@ app.get('/api/detail/:id', async (req, res) => {
     const eps = [];
     $('.episodelist ul li').each((i, el) => {
         const a = $(el).find('a');
-        if (a.length && a.attr('href').includes('/episode/')) {
+        const href = a.attr('href');
+        if (href && href.includes('/episode/')) {
             eps.push({ 
                 title: a.text().trim(), 
-                id: a.attr('href').split('/').filter(Boolean).pop() 
+                id: href.split('/').filter(Boolean).pop() 
             });
         }
     });
     res.json({ 
-        sinop: $('.sinopc').text().trim(), 
+        sinop: $('.sinopc').first().text().trim(), 
         thumb: $('.fotoanime img').attr('src'),
         score: $('.infozingle p:contains("Skor")').text().split(':')[1]?.trim() || 'N/A',
-        eps: eps // Hapus .reverse() jika urutan ingin dari terbaru ke lama
+        eps: eps
     });
 });
 
 app.get('/api/video/:id', async (req, res) => {
     const $ = await fetchD(`${BASE_URL}episode/${req.params.id}`);
     if(!$) return res.json({u: '', dl: []});
+    
+    // Cari iframe di area streaming
+    let streamUrl = $('#pembed iframe').attr('src') || $('.responsive-embed-stream iframe').attr('src');
+    
+    // Jika tidak ketemu, coba cari di area lain
+    if(!streamUrl) {
+        streamUrl = $('iframe').first().attr('src');
+    }
+
     const dl = [];
     $('.download ul li').each((i, el) => {
         const q = $(el).find('strong').text().trim();
         const links = [];
-        $(el).find('a').each((j, a) => { links.push({ h: $(a).text().trim(), u: $(a).attr('href') }); });
+        $(el).find('a').each((j, a) => { 
+            links.push({ h: $(a).text().trim(), u: $(a).attr('href') }); 
+        });
         if(q) dl.push({ q, links });
     });
-    res.json({ u: $('.responsive-embed-stream iframe').attr('src'), dl });
-});
 
-app.get('/api/search/:q', async (req, res) => {
-    const $ = await fetchD(`${BASE_URL}?s=${req.params.q}&post_type=anime`);
-    const r = [];
-    if($) $('.chivsrc li').each((i, el) => {
-        r.push({ 
-            title: $(el).find('h2').text().trim(), 
-            thumb: $(el).find('img').attr('src'), 
-            id: $(el).find('a').attr('href').split('/').filter(Boolean).pop(),
-            score: $(el).find('.set').first().text().trim() || 'N/A'
-        });
-    });
-    res.json(r);
+    res.json({ u: streamUrl, dl });
 });
 
 module.exports = app;
