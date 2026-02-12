@@ -7,23 +7,29 @@ const app = express();
 
 app.use(cors());
 const agent = new https.Agent({ rejectUnauthorized: false });
-const BASE_URL = 'https://otakudesu.cloud/';
+
+// DOMAIN TERBARU
+const BASE_URL = 'https://otakudesu.best/';
 
 const fetchD = async (url) => {
     try {
         const { data } = await axios.get(url, { 
             httpsAgent: agent,
-            timeout: 10000,
+            timeout: 15000,
             headers: { 
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Referer': BASE_URL
+                'Referer': BASE_URL,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
             }
         });
         return cheerio.load(data);
-    } catch (e) { return null; }
+    } catch (e) { 
+        console.error("Gagal ambil data:", e.message);
+        return null; 
+    }
 };
 
-app.get('/api/ping', (req, res) => res.json({ s: 'ok' }));
+app.get('/api/ping', (req, res) => res.json({ s: 'ok', domain: BASE_URL }));
 
 app.get('/api/terbaru', async (req, res) => {
     const $ = await fetchD(BASE_URL);
@@ -36,7 +42,7 @@ app.get('/api/terbaru', async (req, res) => {
                 title: $(el).find('h2').text().trim(),
                 thumb: $(el).find('img').attr('src'),
                 id: link.split('/').filter(Boolean).pop(),
-                score: $(el).find('.skor').text().trim() || '0'
+                score: $(el).find('.skor').text().trim() || 'N/A'
             });
         }
     });
@@ -49,7 +55,7 @@ app.get('/api/detail/:id', async (req, res) => {
     const eps = [];
     $('.episodelist ul li').each((i, el) => {
         const a = $(el).find('a');
-        if (a.attr('href')) {
+        if (a.attr('href') && a.attr('href').includes('/episode/')) {
             eps.push({ 
                 title: a.text().trim(), 
                 id: a.attr('href').split('/').filter(Boolean).pop() 
@@ -59,6 +65,7 @@ app.get('/api/detail/:id', async (req, res) => {
     res.json({ 
         sinop: $('.sinopc').first().text().trim(), 
         thumb: $('.fotoanime img').attr('src'),
+        score: $('.infozingle p:contains("Skor")').text().split(':')[1]?.trim() || 'N/A',
         eps: eps
     });
 });
@@ -67,16 +74,10 @@ app.get('/api/video/:id', async (req, res) => {
     const $ = await fetchD(`${BASE_URL}episode/${req.params.id}`);
     if(!$) return res.json({u: '', dl: []});
     
-    // Taktik 1: Cari di iframe utama
-    let v = $('.responsive-embed-stream iframe').attr('src') || $('#pembed iframe').attr('src');
-    
-    // Taktik 2: Jika masih kosong, cari di semua iframe yang ada
-    if(!v) {
-        $('iframe').each((i, el) => {
-            const src = $(el).attr('src');
-            if(src && (src.includes('desustream') || src.includes('embed'))) v = src;
-        });
-    }
+    // Scraper Video Iframe
+    let v = $('#pembed iframe').attr('src') || 
+            $('.responsive-embed-stream iframe').attr('src') || 
+            $('.mirrorstream iframe').first().attr('src');
 
     const dl = [];
     $('.download ul li').each((i, el) => {
